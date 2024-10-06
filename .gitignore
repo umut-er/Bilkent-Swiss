@@ -1,0 +1,19 @@
+# Ignore Mac system files
+.DS_Store
+
+# Ignore all object files and other generated binaries
+*.obj
+*.o
+
+# Ignore build directories and binary output
+bin/
+.deps/
+.obj/
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore temporary or log files
+imgui.ini
+round.txt
+out.trf
