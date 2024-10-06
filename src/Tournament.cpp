@@ -10,8 +10,8 @@ Tournament::Tournament() : round(0), tournament_started(false) {
 }
 
 Tournament::Tournament(std::string tournament_name, std::string tournament_city, 
-                        std::string federation, std::string chief_arbiter) 
-    : round(0), tournament_started(false), tournament_name(tournament_name),
+                        std::string federation, std::string chief_arbiter, int rounds) 
+    : round(0), max_rounds(rounds), tournament_started(false), tournament_name(tournament_name),
     tournament_city(tournament_city), federation(federation), chief_arbiter(chief_arbiter) {
 
 }
@@ -117,7 +117,7 @@ void Tournament::create_trf_file(){
     std::ofstream output_trf("out.trf");
 
     output_trf << "XXC white1\n";
-    output_trf << "XXR 9\n";
+    output_trf << "XXR " << max_rounds << "\n";
 
     int idx = 1;
     for(const Player& player : player_list){

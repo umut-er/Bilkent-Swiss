@@ -1,10 +1,22 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include "ImGuiFileDialog.h"
 #include <SDL2/SDL.h>
 #include <iostream>
 
 #include "Tournament.h"
+
+// Store State Variables
+struct StateVariables{
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    bool show_create_tournament = false;
+    bool show_add_player = false;
+    bool tournament_loaded = false;
+    bool tournament_started = false;
+    int player_selected_idx = -1;
+    int pairing_selected_idx = -1;
+};
 
 int initialize(SDL_Renderer*& renderer, SDL_Window*& window, ImGuiIO& io){
     // Setup SDL
@@ -50,20 +62,25 @@ int initialize(SDL_Renderer*& renderer, SDL_Window*& window, ImGuiIO& io){
 }
 
 Tournament load_tournament(char tournament_name[], char city[],
-                            char federation[], char chief_arbiter[]){
-    Tournament t(tournament_name, city, federation, chief_arbiter);
+                            char federation[], char chief_arbiter[], int rounds){
+    Tournament t(tournament_name, city, federation, chief_arbiter, rounds);
     return t;
 }
 
-void show_create_tournament_window(bool* p_open, Tournament& t, bool* tournament_loaded, bool* tournament_started){
+void load_trf_file(Tournament& t, StateVariables& sv, std::string& trf_path){
+
+}
+
+void show_create_tournament_window(Tournament& t, StateVariables& sv){
     ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x / 2, ImGui::GetIO().DisplaySize.y / 2), ImGuiCond_Appearing, ImVec2(0.5f,0.5f));
-    ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x / 3, 158));
+    ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x / 3, 181));
 
     static char tournament_name[128] = "";
     static char city[128] = "";
     static char federation[128] = "";
     static char chief_arbiter[128] = "";
-    ImGui::Begin("Create Tournament", p_open, ImGuiWindowFlags_NoResize);
+    static int rounds = 9;
+    ImGui::Begin("Create Tournament", &sv.show_create_tournament, ImGuiWindowFlags_NoResize);
     if(ImGui::BeginTable("Tournament Info", 2, ImGuiTableFlags_SizingFixedFit)){
         ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthStretch);
@@ -104,6 +121,15 @@ void show_create_tournament_window(bool* p_open, Tournament& t, bool* tournament
         ImGui::InputText("Chief Arbiter", chief_arbiter, 128);
         ImGui::PopItemWidth();
 
+        // Round Count
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Round Count");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("Round Count", &rounds);
+        ImGui::PopItemWidth();
+
         ImGui::EndTable();
     }
 
@@ -112,14 +138,14 @@ void show_create_tournament_window(bool* p_open, Tournament& t, bool* tournament
     if(ImGui::BeginTable("Create Tournament Create/Cancel", 2, ImGuiTableFlags_SizingStretchSame)){
         ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
         if(ImGui::Button("Create", ImVec2(-FLT_MIN, 0))){
-            t = load_tournament(tournament_name, city, federation, chief_arbiter);
-            *tournament_loaded = true;
-            *tournament_started = false;
-            *p_open = false;
+            t = load_tournament(tournament_name, city, federation, chief_arbiter, rounds);
+            sv.tournament_loaded = true;
+            sv.tournament_started = false;
+            sv.show_create_tournament = false;
         }
         ImGui::TableSetColumnIndex(1);
         if(ImGui::Button("Cancel", ImVec2(-FLT_MIN, 0))){
-            *p_open = false;
+            sv.show_create_tournament = false;
         }
 
         ImGui::EndTable();
@@ -128,13 +154,13 @@ void show_create_tournament_window(bool* p_open, Tournament& t, bool* tournament
     ImGui::End();
 }
 
-void show_add_player_window(bool* p_open, Tournament& t){
+void show_add_player_window(Tournament& t, StateVariables& sv){
     ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x / 2, ImGui::GetIO().DisplaySize.y / 2), ImGuiCond_Appearing, ImVec2(0.5f,0.5f));
     ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x / 3, 112));
 
     static char player_name[128];
     static int player_rating;
-    ImGui::Begin("Create Tournament", p_open, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("Create Tournament", &sv.show_add_player, ImGuiWindowFlags_NoResize);
     if(ImGui::BeginTable("Tournament Info", 2, ImGuiTableFlags_SizingFixedFit)){
         ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthStretch);
@@ -166,11 +192,11 @@ void show_add_player_window(bool* p_open, Tournament& t){
         ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
         if(ImGui::Button("Create", ImVec2(-FLT_MIN, 0))){
             t.add_player(player_name, player_rating);
-            *p_open = false;
+            sv.show_add_player = false;
         }
         ImGui::TableSetColumnIndex(1);
         if(ImGui::Button("Cancel", ImVec2(-FLT_MIN, 0))){
-            *p_open = false;
+            sv.show_add_player = false;
         }
 
         ImGui::EndTable();
@@ -179,10 +205,10 @@ void show_add_player_window(bool* p_open, Tournament& t){
     ImGui::End();
 }
 
-void show_initial_ranking_listing(Tournament& tournament, bool tournament_loaded, int& player_selected_idx){
+void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
     bool hovered = false;
     if (ImGui::BeginTabItem("Initial Rankings")){
-        if(tournament_loaded){
+        if(sv.tournament_loaded){
             float windowWidth = ImGui::GetWindowSize().x;
             ImVec2 textSize = ImGui::CalcTextSize(tournament.tournament_name.c_str());
             float textX = (windowWidth - textSize.x) * 0.5f;
@@ -209,12 +235,12 @@ void show_initial_ranking_listing(Tournament& tournament, bool tournament_loaded
                     std::string idx_string = std::string(3 - std::to_string(idx).length(), ' ') + std::to_string(idx);
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
-                    if(ImGui::Selectable(idx_string.c_str(), player_selected_idx == idx-1,
+                    if(ImGui::Selectable(idx_string.c_str(), sv.player_selected_idx == idx-1,
                         ImGuiSelectableFlags_SpanAllColumns)){
-                        if(player_selected_idx == idx-1)
-                            player_selected_idx = -1;
+                        if(sv.player_selected_idx == idx-1)
+                            sv.player_selected_idx = -1;
                         else
-                            player_selected_idx = idx-1;
+                            sv.player_selected_idx = idx-1;
                     }
                     hovered |= ImGui::IsItemHovered();
                     ImGui::TableSetColumnIndex(1);
@@ -226,7 +252,7 @@ void show_initial_ranking_listing(Tournament& tournament, bool tournament_loaded
                 ImGui::EndTable();
             }
             if (ImGui::IsMouseClicked(0) && !hovered) {
-                player_selected_idx = -1;  // Deselect if clicking outside the table
+                sv.player_selected_idx = -1;  // Deselect if clicking outside the table
             }
 
         }
@@ -234,7 +260,7 @@ void show_initial_ranking_listing(Tournament& tournament, bool tournament_loaded
     }
 }
 
-void show_pairing_listing(Tournament& tournament, int& pairing_selected_idx){
+void show_pairing_listing(Tournament& tournament, StateVariables& sv){
     bool hovered = false;
     if (ImGui::BeginTabItem("Pairings")){
         if(tournament.round > 0){
@@ -282,12 +308,12 @@ void show_pairing_listing(Tournament& tournament, int& pairing_selected_idx){
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%3d", idx);
                     ImGui::TableSetColumnIndex(1);
-                    if(ImGui::Selectable(tournament.player_list[first_player_idx].name.c_str(), pairing_selected_idx == idx-1,
+                    if(ImGui::Selectable(tournament.player_list[first_player_idx].name.c_str(), sv.pairing_selected_idx == idx-1,
                                         ImGuiSelectableFlags_SpanAllColumns)){
-                        if(pairing_selected_idx == idx-1)
-                            pairing_selected_idx = -1;
+                        if(sv.pairing_selected_idx == idx-1)
+                            sv.pairing_selected_idx = -1;
                         else
-                            pairing_selected_idx = idx-1;
+                            sv.pairing_selected_idx = idx-1;
                     }
                     hovered |= ImGui::IsItemHovered();
                     ImGui::TableSetColumnIndex(2);
@@ -317,19 +343,20 @@ void show_pairing_listing(Tournament& tournament, int& pairing_selected_idx){
                 ImGui::EndTable();
             }
             if (ImGui::IsMouseClicked(0) && !hovered) {
-                pairing_selected_idx = -1;  // Deselect if clicking outside the table
+                sv.pairing_selected_idx = -1;  // Deselect if clicking outside the table
             }
         }
         ImGui::EndTabItem();
     }
 }
 
-void show_ranking_listing(Tournament& tournament){
+void show_ranking_listing(Tournament& tournament, StateVariables& sv){
     if (ImGui::BeginTabItem("Rankings")){
         ImGui::Text("This page displays current rankings after the most recently finished round.");
         ImGui::EndTabItem();
     }
 }
+
 
 int main(){
     SDL_Renderer* renderer; SDL_Window* window; ImGuiIO io;
@@ -337,15 +364,8 @@ int main(){
     if(err_code != 0)
         return -1;
 
-    // Our state variables
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     Tournament tournament;
-    bool show_create_tournament = false;
-    bool show_add_player = false;
-    bool tournament_loaded = false;
-    bool tournament_started = false;
-    static int player_selected_idx = -1;
-    static int pairing_selected_idx = -1;
+    static StateVariables sv;
 
     // Main loop
     bool done = false;
@@ -378,18 +398,34 @@ int main(){
                 | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoResize); // ImGuiWindowFlags_NoDecoration
             if (ImGui::BeginMenuBar()){ 
                 if (ImGui::BeginMenu("File")){
-                    ImGui::MenuItem("Load Tournament", "Ctrl-O");       // Load TRF file.
+                    // Load TRF file.
+                    if(ImGui::MenuItem("Load Tournament", "Ctrl-O")){
+                        IGFD::FileDialogConfig config;
+	                    config.path = ".";
+                        config.countSelectionMax = 1;
+                        ImGuiFileDialog::Instance()->OpenDialog("LoadTRF", "Choose File", nullptr, config);
+                    }       
                     ImGui::MenuItem("Save Tournament", "Ctrl-S");       // Save as TRF.
                     ImGui::EndMenu();
+                }
+                if (ImGuiFileDialog::Instance()->Display("LoadTRF")) {
+                    if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
+                        std::string file_path_name = ImGuiFileDialog::Instance()->GetFilePathName();
+                        // std::string file_path = ImGuiFileDialog::Instance()->GetCurrentPath();
+                        load_trf_file(tournament, sv, file_path_name);
+                    }
+                    
+                    // close
+                    ImGuiFileDialog::Instance()->Close();
                 }
                 ImGui::EndMenuBar();
             }
             ImGui::BeginChild("Tournament", ImVec2(ImGui::GetContentRegionAvail().x * 0.7f, ImGui::GetContentRegionAvail().y),
                     ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
             if(ImGui::BeginTabBar("Listings")){
-                show_initial_ranking_listing(tournament, tournament_loaded, player_selected_idx);
-                show_pairing_listing(tournament, pairing_selected_idx);
-                show_ranking_listing(tournament);
+                show_initial_ranking_listing(tournament, sv);
+                show_pairing_listing(tournament, sv);
+                show_ranking_listing(tournament, sv);
                 ImGui::EndTabBar();
             }
             ImGui::EndChild();  
@@ -401,46 +437,46 @@ int main(){
                 if (ImGui::BeginTabItem("Edit Tournament")){
 
                     if(ImGui::Button("Create New Tournament", ImVec2(-FLT_MIN, 30))){
-                        show_create_tournament = true;
+                        sv.show_create_tournament = true;
                     }
 
-                    if(!tournament_loaded)
+                    if(!sv.tournament_loaded)
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Add Player", ImVec2(-FLT_MIN, 30)))
-                        show_add_player = true;
+                        sv.show_add_player = true;
 
-                    if(player_selected_idx == -1)
+                    if(sv.player_selected_idx == -1)
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Edit Player", ImVec2(-FLT_MIN, 30))){
 
                     }
-                    if(tournament_started)
+                    if(sv.tournament_started)
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Remove Player", ImVec2(-FLT_MIN, 30))){
 
                     }
-                    if(tournament_started)
+                    if(sv.tournament_started)
                         ImGui::EndDisabled();
-                    if(player_selected_idx == -1)
+                    if(sv.player_selected_idx == -1)
                         ImGui::EndDisabled();
 
-                    [&tournament_started, &tournament](bool disable_this_button){
+                    [&tournament](bool disable_this_button){
                         if(disable_this_button)
                             ImGui::BeginDisabled();
                         if(ImGui::Button("Start Tournament", ImVec2(-FLT_MIN, 30))){
                             tournament.start_tournament();
-                            tournament_started = true;
+                            sv.tournament_started = true;
                         }
                         if(disable_this_button)
                             ImGui::EndDisabled();
-                    }(tournament_started);
+                    }(sv.tournament_started);
 
-                    if(!tournament_loaded)
+                    if(!sv.tournament_loaded)
                         ImGui::EndDisabled();
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Manage Pairings")){
-                    if(!tournament_started)
+                    if(!sv.tournament_started)
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Pair Next Round", ImVec2(-FLT_MIN, 30))){
                         tournament.create_pairing();
@@ -450,7 +486,7 @@ int main(){
 
                     ImGui::Separator();
 
-                    if(pairing_selected_idx == -1)
+                    if(sv.pairing_selected_idx == -1)
                         ImGui::BeginDisabled();
                     if(ImGui::BeginTable("Tournament Info", 3, ImGuiTableFlags_SizingFixedFit)){
                         ImGui::TableSetupColumn("ROW1", ImGuiTableColumnFlags_WidthStretch);
@@ -486,9 +522,9 @@ int main(){
 
                         ImGui::EndTable();
                     }
-                    if(pairing_selected_idx == -1)
+                    if(sv.pairing_selected_idx == -1)
                         ImGui::EndDisabled();
-                    if(!tournament_started)
+                    if(!sv.tournament_started)
                         ImGui::EndDisabled();
 
                     ImGui::EndTabItem();
@@ -499,18 +535,19 @@ int main(){
             ImGui::End();
         }
 
-        if(show_create_tournament)
-            show_create_tournament_window(&show_create_tournament, tournament, &tournament_loaded, &tournament_started);
+        if(sv.show_create_tournament)
+            show_create_tournament_window(tournament, sv);
 
-        if(show_add_player)
-            show_add_player_window(&show_add_player, tournament);
+        if(sv.show_add_player)
+            show_add_player_window(tournament, sv);
 
         ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255), (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+        SDL_SetRenderDrawColor(renderer, (Uint8)(sv.clear_color.x * 255), (Uint8)(sv.clear_color.y * 255), 
+                                (Uint8)(sv.clear_color.z * 255), (Uint8)(sv.clear_color.w * 255));
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);

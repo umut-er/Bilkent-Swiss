@@ -18,6 +18,7 @@ private:
 
 public:
     int round;
+    int max_rounds;
     bool tournament_started;
     std::vector<Player> player_list;
     std::vector<std::pair<int, int>> pairings; // vector of player ids 
@@ -30,7 +31,7 @@ public:
 
     Tournament();
     Tournament(std::string tournament_name, std::string tournament_city, 
-            std::string federation, std::string chief_arbiter);
+            std::string federation, std::string chief_arbiter, int rounds);
 
     // Utility methods for manipulating players & player information.
     void add_player(std::string name, int rating);
