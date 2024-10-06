@@ -1,13 +1,13 @@
 # Compiler and flags
 CC = g++-14
 CFLAGS = -Wall -O2
-IFLAGS = -Iimgui -Iimgui/backends -Iinclude
+IFLAGS = -I$(IMGUI_DIR) -I$(IMGUI_BACKEND_DIR) -Iinclude -Iexternal/ImGuiFileDialog
 LFLAGS = -lSDL2 -lsdl2main
 
 # Directories
 SRC_DIR = src
-IMGUI_DIR = imgui
-IMGUI_BACKEND_DIR = imgui/backends
+IMGUI_DIR = external/imgui
+IMGUI_BACKEND_DIR = $(IMGUI_DIR)/backends
 OBJ_DIR = .obj
 BIN_DIR = bin
 
@@ -18,7 +18,8 @@ BIN = $(BIN_DIR)/main
 SRCS = $(wildcard $(SRC_DIR)/*.cpp) \
        $(IMGUI_BACKEND_DIR)/imgui_impl_sdl2.cpp \
        $(IMGUI_BACKEND_DIR)/imgui_impl_sdlrenderer2.cpp \
-       $(wildcard $(IMGUI_DIR)/imgui*.cpp)
+       $(wildcard $(IMGUI_DIR)/imgui*.cpp) \
+	   external/ImGuiFileDialog/ImGuiFileDialog.cpp
 
 OBJS = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(notdir $(SRCS)))
 
@@ -42,6 +43,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR) $(DEP_DIR)
 	$(CC) $(CFLAGS) $(IFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(IMGUI_BACKEND_DIR)/%.cpp | $(OBJ_DIR) $(DEP_DIR)
+	$(CC) $(CFLAGS) $(IFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/ImGuiFileDialog.o: external/ImGuiFileDialog/ImGuiFileDialog.cpp | $(OBJ_DIR) $(DEP_DIR)
 	$(CC) $(CFLAGS) $(IFLAGS) -c $< -o $@
 
 $(OBJ_DIR)/%.o: $(IMGUI_DIR)/%.cpp | $(OBJ_DIR) $(DEP_DIR)
