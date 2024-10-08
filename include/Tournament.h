@@ -19,9 +19,11 @@ private:
 public:
     int round;
     int max_rounds;
+    bool first_table_white = true;
     bool tournament_started;
     std::vector<Player> player_list;
-    std::vector<std::pair<int, int>> pairings; // vector of player ids 
+    std::vector<std::pair<int, int>> pairings; // vector of player ids
+    std::vector<MatchResult> pairing_results;
     std::map<int, int> player_id_to_idx;
 
     std::string tournament_name;
@@ -37,7 +39,10 @@ public:
     void add_player(std::string name, int rating);
     void remove_player(std::string name);
     void remove_player_idx(int idx);
+    void deactivate_player(std::string name);
+    void deactivate_player_idx(int idx);
     void activate_player(std::string name);
+    void activate_player_idx(int idx);
     void change_player_rating(std::string name, int new_rating);
     void change_player_name(std::string old_name, std::string new_name);
     void change_player_rating_idx(int idx, int new_rating);
@@ -46,15 +51,15 @@ public:
     // Initializes the tournament with the given player list.
     void start_tournament();
     
-    // Helper method to print out the tournament.
-    void print_player_list();
+    static Tournament read_trf_file(const std::string& path);
     // Creates the TRF (tournament report file).
     void create_trf_file();
     // Create Pairing for Current Round
     void create_pairing();
-    void print_pairing();
     // Read Results for Current Round
     void get_pairing_results();
+
+    void enter_pairing_result(int idx, MatchResult res);
 };
 
 #endif

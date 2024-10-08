@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <map>
+#include <string>
 
 enum class MatchResult {
     REGULAR_WHITE_WIN,
@@ -21,7 +22,8 @@ enum class MatchResult {
     FULL_POINT_BYE,
     PAIRING_ALLOCATED_BYE,
 
-    UNMATCHED           // For absent players
+    UNMATCHED,          // For absent players
+    UNINITIALIZED
 };
 
 enum class PlayerResult {
@@ -45,7 +47,9 @@ enum class PlayerResult {
 };
 
 extern std::map<MatchResult, std::pair<int, int>> result_to_points;
+extern std::map<MatchResult, std::string> result_to_string;
 extern std::map<PlayerResult, char> result_to_rtfchar;
+extern std::map<char, PlayerResult> rtfchar_to_result;
 
 /**
  * Basic Class for Recording Games
@@ -57,6 +61,7 @@ public:
     int black_player_id;
     MatchResult game_result;
 
+    Match();
     Match(int round, int white_id);     // Constructor for absentee games.
     Match(int round, int white_id, int black_id, MatchResult result);
 

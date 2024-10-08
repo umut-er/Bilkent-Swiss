@@ -4,6 +4,7 @@
 #include "ImGuiFileDialog.h"
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <cstring>
 
 #include "Tournament.h"
 
@@ -12,8 +13,10 @@ struct StateVariables{
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     bool show_create_tournament = false;
     bool show_add_player = false;
+    bool show_modify_player = false;
     bool tournament_loaded = false;
     bool tournament_started = false;
+    bool listings_hovered = false;
     int player_selected_idx = -1;
     int pairing_selected_idx = -1;
 };
@@ -68,7 +71,14 @@ Tournament load_tournament(char tournament_name[], char city[],
 }
 
 void load_trf_file(Tournament& t, StateVariables& sv, std::string& trf_path){
-
+    sv.player_selected_idx = -1;
+    sv.pairing_selected_idx = -1;
+    t = Tournament::read_trf_file(trf_path);
+    sv.tournament_loaded = true;
+    if(t.round > 0)
+        sv.tournament_started = true;
+    else
+        sv.tournament_started = false;
 }
 
 void show_create_tournament_window(Tournament& t, StateVariables& sv){
@@ -160,7 +170,7 @@ void show_add_player_window(Tournament& t, StateVariables& sv){
 
     static char player_name[128];
     static int player_rating;
-    ImGui::Begin("Create Tournament", &sv.show_add_player, ImGuiWindowFlags_NoResize);
+    ImGui::Begin("Add Player", &sv.show_add_player, ImGuiWindowFlags_NoResize);
     if(ImGui::BeginTable("Tournament Info", 2, ImGuiTableFlags_SizingFixedFit)){
         ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthStretch);
@@ -205,6 +215,66 @@ void show_add_player_window(Tournament& t, StateVariables& sv){
     ImGui::End();
 }
 
+void show_modify_player_window(Tournament& t, StateVariables& sv){
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x / 2, ImGui::GetIO().DisplaySize.y / 2), ImGuiCond_Appearing, ImVec2(0.5f,0.5f));
+    ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x / 3, 112));
+
+    static char player_name[128];
+    static bool player_initialized = false;
+    if(!player_initialized){
+        std::strcpy(player_name, t.player_list[sv.player_selected_idx].name.c_str());
+        player_initialized = true;
+    }
+    static int player_rating = t.player_list[sv.player_selected_idx].rating;
+    ImGui::Begin("Edit Player", &sv.show_modify_player, ImGuiWindowFlags_NoResize);
+    if(ImGui::BeginTable("Edit Player", 2, ImGuiTableFlags_SizingFixedFit)){
+        ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Input", ImGuiTableColumnFlags_WidthStretch);
+
+        // PLAYER NAME
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Player Name");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::PushItemWidth(-1);
+        ImGui::InputText("Player Name", player_name, 128);
+        ImGui::PopItemWidth();
+
+        // PLAYER RATING
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
+        ImGui::Text("Player Rating");
+
+        ImGui::TableSetColumnIndex(1);
+        ImGui::PushItemWidth(-1);
+        ImGui::InputInt("Player Rating", &player_rating);
+        ImGui::PopItemWidth();
+
+        ImGui::EndTable();
+    }
+
+    ImGui::Separator();
+
+    if(ImGui::BeginTable("Modify Player Create/Cancel", 2, ImGuiTableFlags_SizingStretchSame)){
+        ImGui::TableNextRow(); ImGui::TableSetColumnIndex(0);
+        if(ImGui::Button("Edit", ImVec2(-FLT_MIN, 0))){
+            t.change_player_name_idx(sv.player_selected_idx, player_name);
+            t.change_player_rating_idx(sv.player_selected_idx, player_rating);
+            std::cout << t.player_list[sv.player_selected_idx].name << "\n";
+            sv.show_modify_player = false;
+            player_initialized = false;
+        }
+        ImGui::TableSetColumnIndex(1);
+        if(ImGui::Button("Cancel", ImVec2(-FLT_MIN, 0))){
+            sv.show_modify_player = false;
+            player_initialized = false;
+        }
+
+        ImGui::EndTable();
+    }
+
+    ImGui::End();
+}
+
 void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
     bool hovered = false;
     if (ImGui::BeginTabItem("Initial Rankings")){
@@ -216,9 +286,10 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::SetCursorPosX(textX);
             }
             ImGui::Text(tournament.tournament_name.c_str());
-            if(ImGui::BeginTable("Tournament Info", 3, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
+            if(ImGui::BeginTable("Tournament Info", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
                 ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Pairing Status", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Rating", ImGuiTableColumnFlags_WidthFixed);
 
                 // Headers
@@ -228,6 +299,8 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::TableSetColumnIndex(1);
                 ImGui::Text("Name");
                 ImGui::TableSetColumnIndex(2);
+                ImGui::Text("Pairing Status");
+                ImGui::TableSetColumnIndex(3);
                 ImGui::Text("Rtg");
                 
                 int idx = 1;
@@ -245,13 +318,17 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                     hovered |= ImGui::IsItemHovered();
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text(player.name.c_str());
-                    ImGui::TableSetColumnIndex(2);
+                    if(!player.active){
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::Text("UNPAIRED");
+                    }
+                    ImGui::TableSetColumnIndex(3);
                     ImGui::Text("%4d", player.rating);
                     idx++;
                 }
                 ImGui::EndTable();
             }
-            if (ImGui::IsMouseClicked(0) && !hovered) {
+            if (ImGui::IsMouseClicked(0) && !hovered && sv.listings_hovered) {
                 sv.player_selected_idx = -1;  // Deselect if clicking outside the table
             }
 
@@ -292,7 +369,7 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::TableSetColumnIndex(3);
                 ImGui::Text("Pts.");
                 ImGui::TableSetColumnIndex(4);
-                ImGui::Text("Result");
+                ImGui::Text("  Result  ");
                 ImGui::TableSetColumnIndex(5);
                 ImGui::Text("Pts.");
                 ImGui::TableSetColumnIndex(6);
@@ -320,8 +397,15 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
                     ImGui::Text("%4d", tournament.player_list[first_player_idx].rating);
                     ImGui::TableSetColumnIndex(3);
                     ImGui::Text("%2.1f", tournament.player_list[first_player_idx].points / 2.);
+
                     ImGui::TableSetColumnIndex(4);
-                    ImGui::Text(" ");
+                    float column_width = ImGui::GetColumnWidth();
+                    ImVec2 text_size = ImGui::CalcTextSize(result_to_string.at(tournament.pairing_results[idx-1]).c_str());
+                    float text_x = (column_width - text_size.x) * 0.5f;
+                    if (text_x > 0.0f)
+                        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + text_x);
+                    ImGui::Text(result_to_string.at(tournament.pairing_results[idx-1]).c_str());
+
                     ImGui::TableSetColumnIndex(5);
                     ImGui::Text("%2.1f", tournament.player_list[second_player_idx].points / 2.);
                     ImGui::TableSetColumnIndex(6);
@@ -342,7 +426,7 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
 
                 ImGui::EndTable();
             }
-            if (ImGui::IsMouseClicked(0) && !hovered) {
+            if (ImGui::IsMouseClicked(0) && !hovered && sv.listings_hovered) {
                 sv.pairing_selected_idx = -1;  // Deselect if clicking outside the table
             }
         }
@@ -364,7 +448,7 @@ int main(){
     if(err_code != 0)
         return -1;
 
-    Tournament tournament;
+    static Tournament tournament;
     static StateVariables sv;
 
     // Main loop
@@ -379,8 +463,7 @@ int main(){
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
         }
-        if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED)
-        {
+        if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED){
             SDL_Delay(10);
             continue;
         }
@@ -403,7 +486,7 @@ int main(){
                         IGFD::FileDialogConfig config;
 	                    config.path = ".";
                         config.countSelectionMax = 1;
-                        ImGuiFileDialog::Instance()->OpenDialog("LoadTRF", "Choose File", nullptr, config);
+                        ImGuiFileDialog::Instance()->OpenDialog("LoadTRF", "Choose File", ".trf", config);
                     }       
                     ImGui::MenuItem("Save Tournament", "Ctrl-S");       // Save as TRF.
                     ImGui::EndMenu();
@@ -423,6 +506,7 @@ int main(){
             ImGui::BeginChild("Tournament", ImVec2(ImGui::GetContentRegionAvail().x * 0.7f, ImGui::GetContentRegionAvail().y),
                     ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
             if(ImGui::BeginTabBar("Listings")){
+                sv.listings_hovered = ImGui::IsWindowHovered();
                 show_initial_ranking_listing(tournament, sv);
                 show_pairing_listing(tournament, sv);
                 show_ranking_listing(tournament, sv);
@@ -444,23 +528,21 @@ int main(){
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Add Player", ImVec2(-FLT_MIN, 30)))
                         sv.show_add_player = true;
-
                     if(sv.player_selected_idx == -1)
                         ImGui::BeginDisabled();
-                    if(ImGui::Button("Edit Player", ImVec2(-FLT_MIN, 30))){
-
-                    }
+                    if(ImGui::Button("Edit Player", ImVec2(-FLT_MIN, 30)))
+                        sv.show_modify_player = true;
                     if(sv.tournament_started)
                         ImGui::BeginDisabled();
                     if(ImGui::Button("Remove Player", ImVec2(-FLT_MIN, 30))){
-
+                        tournament.remove_player_idx(sv.player_selected_idx);
                     }
                     if(sv.tournament_started)
                         ImGui::EndDisabled();
                     if(sv.player_selected_idx == -1)
                         ImGui::EndDisabled();
 
-                    [&tournament](bool disable_this_button){
+                    [](bool disable_this_button){
                         if(disable_this_button)
                             ImGui::BeginDisabled();
                         if(ImGui::Button("Start Tournament", ImVec2(-FLT_MIN, 30))){
@@ -478,11 +560,29 @@ int main(){
                 if (ImGui::BeginTabItem("Manage Pairings")){
                     if(!sv.tournament_started)
                         ImGui::BeginDisabled();
-                    if(ImGui::Button("Pair Next Round", ImVec2(-FLT_MIN, 30))){
+                    if(ImGui::Button("Pair Next Round", ImVec2(-FLT_MIN, 30)))
                         tournament.create_pairing();
+                    if(ImGui::Button("Conclude Current Round", ImVec2(-FLT_MIN, 30))){
+                        // TODO: Finish This Part.
                     }
-                    ImGui::Button("Add Player to Pairings", ImVec2(-FLT_MIN, 30));
-                    ImGui::Button("Remove Player from Pairings", ImVec2(-FLT_MIN, 30));
+
+                    int pidxcopy = sv.player_selected_idx;
+                    bool pactivecopy = sv.player_selected_idx > 0 ? tournament.player_list[sv.player_selected_idx].active : false;
+                    if(pidxcopy == -1 
+                        || pactivecopy)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Add Player to Pairings", ImVec2(-FLT_MIN, 30)))
+                        tournament.activate_player_idx(sv.player_selected_idx);
+                    if(pidxcopy == -1 
+                        || pactivecopy)
+                        ImGui::EndDisabled();
+                    
+                    if(pidxcopy == -1 || !pactivecopy)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Remove Player from Pairings", ImVec2(-FLT_MIN, 30)))
+                        tournament.deactivate_player_idx(sv.player_selected_idx);
+                    if(pidxcopy == -1 || !pactivecopy)
+                        ImGui::EndDisabled();
 
                     ImGui::Separator();
 
@@ -496,29 +596,38 @@ int main(){
                         // Regular
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::Button("1-0", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("1 - 0", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::REGULAR_WHITE_WIN);
                         ImGui::TableNextColumn();
-                        ImGui::Button("1/2-1/2", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("1/2 - 1/2", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::REGULAR_DRAW);
                         ImGui::TableNextColumn();
-                        ImGui::Button("0-1", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("0 - 1", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::REGULAR_BLACK_WIN);
 
                         // Forfeit
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::Button("+/-", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("+ / -", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_WHITE_WIN);
                         ImGui::TableNextColumn();
-                        ImGui::Button("=/=", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("- / +", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_BLACK_WIN);
                         ImGui::TableNextColumn();
-                        ImGui::Button("-/-", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("- / -", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_BOTH);
 
                         // Unrated
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
-                        ImGui::Button("W/L", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("W / L", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::UNRATED_WHITE_WIN);
                         ImGui::TableNextColumn();
-                        ImGui::Button("D/D", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("D / D", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::UNRATED_DRAW);
                         ImGui::TableNextColumn();
-                        ImGui::Button("L/W", ImVec2(-FLT_MIN, 30));
+                        if(ImGui::Button("L / W", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::UNRATED_BLACK_WIN);
 
                         ImGui::EndTable();
                     }
@@ -540,6 +649,9 @@ int main(){
 
         if(sv.show_add_player)
             show_add_player_window(tournament, sv);
+
+        if(sv.show_modify_player)
+            show_modify_player_window(tournament, sv);
 
         ImGui::ShowDemoWindow();
 

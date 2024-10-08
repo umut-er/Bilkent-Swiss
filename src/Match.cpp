@@ -18,6 +18,28 @@ std::map<MatchResult, std::pair<int, int>> result_to_points = {
     {MatchResult::PAIRING_ALLOCATED_BYE, {2, 0}},
 
     {MatchResult::UNMATCHED, {0, 0}},
+    {MatchResult::UNINITIALIZED, {0, 0}}
+};
+
+std::map<MatchResult, std::string> result_to_string = {
+    {MatchResult::REGULAR_WHITE_WIN, "1 - 0"},
+    {MatchResult::REGULAR_BLACK_WIN, "0 - 1"},
+    {MatchResult::REGULAR_DRAW, "1/2 - 1/2"},
+
+    {MatchResult::FORFEIT_WHITE_WIN, "+ / -"},
+    {MatchResult::FORFEIT_BLACK_WIN, "- / +"},
+    {MatchResult::FORFEIT_BOTH, "- / -"},
+
+    {MatchResult::UNRATED_WHITE_WIN, "W / L"},
+    {MatchResult::UNRATED_BLACK_WIN, "L / W"},
+    {MatchResult::UNRATED_DRAW, "D / D"},
+
+    {MatchResult::HALF_POINT_BYE, "1 / 2"},
+    {MatchResult::FULL_POINT_BYE, " 1 "},
+    {MatchResult::PAIRING_ALLOCATED_BYE, " 1 "},
+
+    {MatchResult::UNMATCHED, "  "},
+    {MatchResult::UNINITIALIZED, "  "}
 };
 
 std::map<PlayerResult, char> result_to_rtfchar = {
@@ -40,10 +62,33 @@ std::map<PlayerResult, char> result_to_rtfchar = {
 
 };
 
+std::map<char, PlayerResult> rtfchar_to_result = {
+    { '1', PlayerResult::REGULAR_WIN},
+    { '+', PlayerResult::FORFEIT_WIN},
+    { 'W', PlayerResult::UNRATED_WIN},
+
+    { '=', PlayerResult::REGULAR_DRAW},
+    { 'D', PlayerResult::UNRATED_DRAW},
+
+    { '0', PlayerResult::REGULAR_LOSS},
+    { '-', PlayerResult::FORFEIT_LOSS},
+    { 'L', PlayerResult::UNRATED_LOSS},
+
+    { 'F', PlayerResult::FULL_POINT_BYE},
+    { 'H', PlayerResult::HALF_POINT_BYE},
+    { 'U', PlayerResult::PAIRING_ALLOCATED_BYE},
+    { 'Z', PlayerResult::ABSENT}
+
+};
+
+Match::Match(){
+
+}
+
 Match::Match(int round, int white_id)
     : round(round), white_player_id(white_id), black_player_id(-1), game_result(MatchResult::UNMATCHED){
 
-    }
+}
 
 Match::Match(int round, int white_id, int black_id, MatchResult result)
     : round(round), white_player_id(white_id), black_player_id(black_id), game_result(result){

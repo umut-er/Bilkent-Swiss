@@ -37,10 +37,21 @@ void Tournament::remove_player(std::string name){
     auto it = std::find_if(player_list.begin(), player_list.end(), [name](Player& player){
         return player.name == name;
     });
-    it->active = false;
+    player_list.erase(it);
 }
 
 void Tournament::remove_player_idx(int idx){
+    player_list.erase(player_list.begin() + idx);
+}
+
+void Tournament::deactivate_player(std::string name){
+    auto it = std::find_if(player_list.begin(), player_list.end(), [name](Player& player){
+        return player.name == name;
+    });
+    it->active = false;
+}
+
+void Tournament::deactivate_player_idx(int idx){
     player_list[idx].active = false;
 }
 
@@ -51,17 +62,8 @@ void Tournament::activate_player(std::string name){
     it->active = true;
 }
 
-void Tournament::print_player_list(){
-    std::cout << "   " << std::left << std::setw(30) << "PLAYER NAME" << "RATING" << "\n";
-
-    int idx = 1;
-    for(Player& p : player_list){
-        if(!p.active)
-            continue;
-        std::cout << std::left << std::setw(3) << idx 
-            << std::left << std::setw(30) << p.name << p.rating << "\n";
-        idx++;
-    }
+void Tournament::activate_player_idx(int idx){
+    player_list[idx].active = true;
 }
 
 void Tournament::change_player_rating(std::string name, int new_rating){
@@ -101,9 +103,158 @@ void Tournament::create_initial_ordering(){
     );
 
     player_id_to_idx.clear();
-    for(int i = 0; i < player_list.size(); i++){
+    for(int i = 0; i < (int)player_list.size(); i++){
         player_id_to_idx.insert(std::make_pair(player_list[i].id, i));
     }
+}
+
+Tournament Tournament::read_trf_file(const std::string& path){
+    // Tokenize the input file
+    std::ifstream trf_file(path);
+    std::vector<std::string> file_lines;
+    std::string file_line;
+    while(std::getline(trf_file, file_line)){
+        file_lines.push_back(file_line);
+    }
+
+    Tournament t;
+
+    // Interpret.
+    for(const std::string& line: file_lines) {
+        if(line.size() < 3)
+            continue;
+
+        std::string data_identification_number = line.substr(0, 3); 
+        if(data_identification_number == "XXC") {
+            t.first_table_white = (line.substr(4) == "white1");
+        }
+        else if(data_identification_number == "XXR") {
+            t.max_rounds = std::stoi(line.substr(4));
+        }
+        else if(data_identification_number == "001") {
+            int starting_rank = std::stoi(line.substr(4, 4));
+            // std::string sex = line.substr(9, 1);
+            // std::string fide_title = line.substr(10, 3);
+            std::string name = line.substr(14, 32);
+            int fide_rating = std::stoi(line.substr(48, 4));
+            // std::string federation = line.substr(53, 3);
+            // int fide_id = std::stoi(line.substr(57, 11));
+            // std::string birth_date = line.substr(69, 10);
+            int points = (int)(2 * std::stof(line.substr(80, 4)));
+            // int rank = std::stoi(line.substr(85, 4));
+
+            Player p(name, fide_rating);
+            p.id = starting_rank;
+            p.points = points;
+
+            int end_idx = 98, idx = 0;
+            while(end_idx < (int)line.size()){
+                idx++;
+                int start_idx = end_idx - 7;
+                std::string opponent_string = line.substr(start_idx, 4);
+                start_idx += 5;
+                char color = line.substr(start_idx, 1)[0];
+                start_idx += 2;
+                char result = line.substr(start_idx, 1)[0];
+                start_idx += 3;
+
+                // TODO: create matches
+                Match m;
+                m.round = idx;
+                if(opponent_string == "    " || opponent_string == "0000"){
+                    m.white_player_id = starting_rank;
+                    m.black_player_id = -1;
+                    if(result == 'h' || result == 'H')
+                        m.game_result = MatchResult::HALF_POINT_BYE;
+                    else if(result == 'f' || result == 'F')
+                        m.game_result = MatchResult::FULL_POINT_BYE;
+                    else if(result == 'u' || result == 'U')
+                        m.game_result = MatchResult::PAIRING_ALLOCATED_BYE;
+                    else if(result == 'z' || result == 'Z' || result == ' ')
+                        m.game_result = MatchResult::UNMATCHED;
+                    continue;
+                }
+                int opponent = std::stoi(opponent_string);
+                bool color_bool = (color == 'w' || color == 'W');
+                if(color == 'w' || color == 'W'){
+                    m.white_player_id = starting_rank;
+                    m.black_player_id = opponent;
+                }
+                else if(color == 'b' || color == 'B'){
+                    m.white_player_id = opponent;
+                    m.black_player_id = starting_rank;
+                }
+                
+                // Result 
+                if(result == '-')
+                    m.game_result = color_bool ? MatchResult::FORFEIT_BLACK_WIN : MatchResult::FORFEIT_WHITE_WIN;
+                else if(result == '+')
+                    m.game_result = color_bool ? MatchResult::FORFEIT_WHITE_WIN : MatchResult::FORFEIT_BLACK_WIN;
+                else if(result == 'w' || result == 'W')
+                    m.game_result = color_bool ? MatchResult::UNRATED_WHITE_WIN : MatchResult::UNRATED_BLACK_WIN;
+                else if(result == 'd' || result == 'D')
+                    m.game_result = MatchResult::UNRATED_DRAW;
+                else if(result == 'l' || result == 'L')
+                    m.game_result = color_bool ? MatchResult::UNRATED_BLACK_WIN : MatchResult::UNRATED_WHITE_WIN;
+                else if(result == '1')
+                    m.game_result = color_bool ? MatchResult::REGULAR_WHITE_WIN : MatchResult::REGULAR_BLACK_WIN;
+                else if(result == '=')
+                    m.game_result = MatchResult::REGULAR_DRAW;
+                else if(result == '0')
+                    m.game_result = color_bool ? MatchResult::REGULAR_BLACK_WIN : MatchResult::REGULAR_WHITE_WIN;
+
+                p.player_matches.push_back(m);
+            }
+            if(t.round != 0)
+                t.round = std::min(idx, t.round);
+            else
+                t.round = idx;
+
+            t.player_list.push_back(p);
+        }
+        else if(data_identification_number == "012") {
+            t.tournament_name = line.substr(4);
+        }
+        else if(data_identification_number == "022") {
+            t.tournament_city = line.substr(4);
+        }
+        else if(data_identification_number == "032") {
+            t.federation = line.substr(4);
+        }
+        else if(data_identification_number == "042") {
+            // date of start
+        }
+        else if(data_identification_number == "052") {
+            // date of end
+        }
+        else if(data_identification_number == "062") {
+            // number of players
+        }
+        else if(data_identification_number == "072") {
+            // number of rated players
+        }
+        else if(data_identification_number == "082") {
+            // number of teams
+        }
+        else if(data_identification_number == "092") {
+            // type of tournament
+        }
+        else if(data_identification_number == "102") {
+            t.chief_arbiter = line.substr(4);
+        }
+        else if(data_identification_number == "112") {
+            // deputy chief arbiter (one line for each arbiter)
+        }
+        else if(data_identification_number == "122") {
+            // allotted times per moves/game
+        }
+        else if(data_identification_number == "132") {
+            // dates of the round  YY/MM/DD
+        }
+    }
+
+    // TODO: Validate tournament, especially match results. Also, set FORFEIT_BOTHs;
+    return t;
 }
 
 void Tournament::start_tournament(){
@@ -123,9 +274,9 @@ void Tournament::create_trf_file(){
     for(const Player& player : player_list){
         output_trf << "001 ";
         output_trf << std::right << std::setw(4) << idx << " ";
-        output_trf << "m ";
+        output_trf << "m";
         output_trf << std::left << std::setw(3) << "   " << " "; // FOR FIDE TITLE
-        output_trf << std::left << std::setw(32) << player.name << " ";
+        output_trf << std::left << std::setw(33) << player.name << " ";
         output_trf << std::left << std::setw(4) << player.rating << " ";
         output_trf << std::left << std::setw(3) << "TUR" << " "; // FOR FIDE FEDERATION
         output_trf << std::right << std::setw(11) << "00000000" << " "; // FIDE ID
@@ -173,7 +324,7 @@ void Tournament::create_pairing(){
     
     pairings.clear();
     std::ifstream pairing_stream("round.txt");
-    int number_of_pairs = 0;
+    int number_of_pairs = 0; bool bye_present = false;
     pairing_stream >> number_of_pairs;
     for(int i = 0; i < number_of_pairs; i++){
         int first_player_idx, second_player_idx;
@@ -181,6 +332,7 @@ void Tournament::create_pairing(){
         if(second_player_idx == 0){ // BYE CONDITION
             int first_player_id = player_list[first_player_idx-1].id;
             pairings.push_back(std::make_pair(first_player_id, -1));
+            bye_present = true;
             continue;
         }
         first_player_idx--; second_player_idx--;
@@ -188,24 +340,18 @@ void Tournament::create_pairing(){
         int second_player_id = player_list[second_player_idx].id;
         pairings.push_back(std::make_pair(first_player_id, second_player_id));
     }
-}
 
-void Tournament::print_pairing(){
-    for(int i = 0; i < pairings.size(); i++){
-        const std::pair<int, int>& pair = pairings[i];
-        int first_player_idx = player_id_to_idx.at(pair.first);
-        int second_player_idx = (pair.second < 0) ? -1 : player_id_to_idx.at(pair.second);
-        std::cout << std::left << std::setw(3) << (i+1) << " ";
-        std::cout << std::left << std::setw(33) << player_list[first_player_idx].name << "   |   ";
-        std::cout << std::right << std::setw(32) << (second_player_idx == -1 ? "Bye" : player_list[second_player_idx].name) << "\n";
-    }
+    pairing_results.clear();
+    pairing_results.resize(pairings.size(), MatchResult::UNINITIALIZED);
+    if(bye_present)
+        pairing_results.back() = MatchResult::PAIRING_ALLOCATED_BYE;
 }
 
 // TODO: add match objects to unmatched players.
 void Tournament::get_pairing_results(){
-    MatchResult result;
+    MatchResult result = MatchResult::UNINITIALIZED;
     std::string pair_result;
-    for(int i = 0; i < pairings.size(); i++){
+    for(int i = 0; i < (int)pairings.size(); i++){
         if(pairings[i].second != -1){
             std::cout << (i+1) << ": ";
             std::cin >> pair_result;
@@ -234,4 +380,8 @@ void Tournament::get_pairing_results(){
         player_list[first_player_idx].player_matches.push_back(match);
         player_list[second_player_idx].player_matches.push_back(match);
     }
+}
+
+void Tournament::enter_pairing_result(int idx, MatchResult res){
+    pairing_results[idx] = res;
 }
