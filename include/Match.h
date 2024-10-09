@@ -62,13 +62,13 @@ public:
     MatchResult game_result;
 
     Match();
-    Match(int round, int white_id);     // Constructor for absentee games.
+    Match(int round, int white_id, MatchResult result);     // Constructor for absentee or bye games.
     Match(int round, int white_id, int black_id, MatchResult result);
 
     PlayerResult get_player_result(int player_id) const;
     int get_opponent_id(int player_id) const;
     int get_player_color(int player_id) const; // 0 -> white, 1 -> black, -1 -> bye, unmatched
-    bool match_is_bye() const;
+    bool match_no_opponent() const;
 };
 
 #endif

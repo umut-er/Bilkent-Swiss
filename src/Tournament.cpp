@@ -24,7 +24,7 @@ void Tournament::add_player(std::string name, int rating){
         return;
     Player p(name, rating);
     for(int i = 0; i < round; i++){
-        p.player_matches.push_back(Match(i+1, p.id));
+        p.player_matches.push_back(Match(i+1, p.id, MatchResult::UNMATCHED));
     }
     player_list.push_back(p);
 
@@ -204,6 +204,7 @@ Tournament Tournament::read_trf_file(const std::string& path){
                     m.game_result = color_bool ? MatchResult::REGULAR_BLACK_WIN : MatchResult::REGULAR_WHITE_WIN;
 
                 p.player_matches.push_back(m);
+                end_idx += 10;
             }
             if(t.round != 0)
                 t.round = std::min(idx, t.round);
@@ -254,6 +255,8 @@ Tournament Tournament::read_trf_file(const std::string& path){
     }
 
     // TODO: Validate tournament, especially match results. Also, set FORFEIT_BOTHs;
+    if(t.round > 0)
+        t.start_tournament();
     return t;
 }
 
@@ -286,7 +289,7 @@ void Tournament::create_trf_file(){
 
         for(const Match& match : player.player_matches){
             std::string opponent_string;
-            if(match.match_is_bye())
+            if(match.match_no_opponent())
                 opponent_string = "    ";
             else{
                 int opponent_id = match.get_opponent_id(player.id);
@@ -307,6 +310,9 @@ void Tournament::create_trf_file(){
             result_string = result_to_rtfchar.at(player_result);
             output_trf << result_string << "  ";
         }
+
+        if(!player.active)
+            output_trf << "     - Z  ";
 
         idx++;
         output_trf << "\n";
@@ -345,41 +351,6 @@ void Tournament::create_pairing(){
     pairing_results.resize(pairings.size(), MatchResult::UNINITIALIZED);
     if(bye_present)
         pairing_results.back() = MatchResult::PAIRING_ALLOCATED_BYE;
-}
-
-// TODO: add match objects to unmatched players.
-void Tournament::get_pairing_results(){
-    MatchResult result = MatchResult::UNINITIALIZED;
-    std::string pair_result;
-    for(int i = 0; i < (int)pairings.size(); i++){
-        if(pairings[i].second != -1){
-            std::cout << (i+1) << ": ";
-            std::cin >> pair_result;
-        }
-        if(pairings[i].second == -1)
-            result = MatchResult::PAIRING_ALLOCATED_BYE;
-        else if(pair_result == "1-0")
-            result = MatchResult::REGULAR_WHITE_WIN;
-        else if(pair_result == "0-1")
-            result = MatchResult::REGULAR_BLACK_WIN;
-        else if(pair_result == "1/2")
-            result = MatchResult::REGULAR_DRAW;
-
-        Match match(round, pairings[i].first, pairings[i].second, result);
-        int first_player_idx = player_id_to_idx[pairings[i].first];
-        if(match.match_is_bye()){
-            player_list[first_player_idx].points += result_to_points.at(result).first;
-            player_list[first_player_idx].player_matches.push_back(match);
-            continue;
-        }
-        int second_player_idx = player_id_to_idx[pairings[i].second];
-
-        // Add Points
-        player_list[first_player_idx].points += result_to_points.at(result).first;
-        player_list[second_player_idx].points += result_to_points.at(result).second;
-        player_list[first_player_idx].player_matches.push_back(match);
-        player_list[second_player_idx].player_matches.push_back(match);
-    }
 }
 
 void Tournament::enter_pairing_result(int idx, MatchResult res){

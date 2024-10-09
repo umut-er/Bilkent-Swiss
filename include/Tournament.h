@@ -56,8 +56,6 @@ public:
     void create_trf_file();
     // Create Pairing for Current Round
     void create_pairing();
-    // Read Results for Current Round
-    void get_pairing_results();
 
     void enter_pairing_result(int idx, MatchResult res);
 };

@@ -17,6 +17,7 @@ struct StateVariables{
     bool tournament_loaded = false;
     bool tournament_started = false;
     bool listings_hovered = false;
+    bool pairing_online = false;
     int player_selected_idx = -1;
     int pairing_selected_idx = -1;
 };
@@ -259,7 +260,6 @@ void show_modify_player_window(Tournament& t, StateVariables& sv){
         if(ImGui::Button("Edit", ImVec2(-FLT_MIN, 0))){
             t.change_player_name_idx(sv.player_selected_idx, player_name);
             t.change_player_rating_idx(sv.player_selected_idx, player_rating);
-            std::cout << t.player_list[sv.player_selected_idx].name << "\n";
             sv.show_modify_player = false;
             player_initialized = false;
         }
@@ -286,9 +286,10 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::SetCursorPosX(textX);
             }
             ImGui::Text(tournament.tournament_name.c_str());
-            if(ImGui::BeginTable("Tournament Info", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
+            if(ImGui::BeginTable("Tournament Info", 5, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
                 ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Pairing Status", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Rating", ImGuiTableColumnFlags_WidthFixed);
 
@@ -299,8 +300,10 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::TableSetColumnIndex(1);
                 ImGui::Text("Name");
                 ImGui::TableSetColumnIndex(2);
-                ImGui::Text("Pairing Status");
+                ImGui::Text("Score");
                 ImGui::TableSetColumnIndex(3);
+                ImGui::Text("Pairing Status");
+                ImGui::TableSetColumnIndex(4);
                 ImGui::Text("Rtg");
                 
                 int idx = 1;
@@ -318,11 +321,18 @@ void show_initial_ranking_listing(Tournament& tournament, StateVariables& sv){
                     hovered |= ImGui::IsItemHovered();
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text(player.name.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%2.1f", player.points / 2.);
                     if(!player.active){
-                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TableSetColumnIndex(3);
+                        float column_width = ImGui::GetColumnWidth();
+                        ImVec2 text_size = ImGui::CalcTextSize("UNPAIRED");
+                        float text_x = (column_width - text_size.x) * 0.5f;
+                        if (text_x > 0.0f)
+                            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + text_x);
                         ImGui::Text("UNPAIRED");
                     }
-                    ImGui::TableSetColumnIndex(3);
+                    ImGui::TableSetColumnIndex(4);
                     ImGui::Text("%4d", player.rating);
                     idx++;
                 }
@@ -407,7 +417,10 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
                     ImGui::Text(result_to_string.at(tournament.pairing_results[idx-1]).c_str());
 
                     ImGui::TableSetColumnIndex(5);
-                    ImGui::Text("%2.1f", tournament.player_list[second_player_idx].points / 2.);
+                    if(second_player_idx < 0)
+                        ImGui::Text("  ");
+                    else
+                        ImGui::Text("%2.1f", tournament.player_list[second_player_idx].points / 2.);
                     ImGui::TableSetColumnIndex(6);
                     std::string black_name_field = "";
                     if(second_player_idx < 0)
@@ -560,11 +573,48 @@ int main(){
                 if (ImGui::BeginTabItem("Manage Pairings")){
                     if(!sv.tournament_started)
                         ImGui::BeginDisabled();
-                    if(ImGui::Button("Pair Next Round", ImVec2(-FLT_MIN, 30)))
+                    
+                    bool ponlinecopy = sv.pairing_online;
+                    if(ponlinecopy)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Pair Next Round", ImVec2(-FLT_MIN, 30))){
                         tournament.create_pairing();
-                    if(ImGui::Button("Conclude Current Round", ImVec2(-FLT_MIN, 30))){
-                        // TODO: Finish This Part.
+                        for(int i = 0; i < (int)tournament.player_list.size(); i++){
+                            if(tournament.player_list[i].active)
+                                continue;
+                            Match absent(tournament.round, tournament.player_list[i].id, MatchResult::UNMATCHED);
+                            tournament.player_list[i].player_matches.push_back(absent);
+                        }
+                        sv.pairing_online = true;
                     }
+                    if(ponlinecopy)
+                        ImGui::EndDisabled();
+                    if(!ponlinecopy)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Conclude Current Round", ImVec2(-FLT_MIN, 30))){
+                        // TODO: Verify all results are entered.
+                        for(int i = 0; i < (int)tournament.pairings.size(); i++){
+                            std::pair<int, int> match_points = result_to_points.at(tournament.pairing_results[i]);
+                            int white_idx = tournament.player_id_to_idx.at(tournament.pairings[i].first);
+                            if(tournament.pairings[i].second < 0){          // BYEs
+                                tournament.player_list[white_idx].points += match_points.first;
+                                Match m(tournament.round, tournament.pairings[i].first, tournament.pairing_results[i]);
+                                tournament.player_list[white_idx].player_matches.push_back(m);
+                                continue;
+                            }
+                            int black_idx = tournament.player_id_to_idx.at(tournament.pairings[i].second);
+                            Match m(tournament.round, tournament.pairings[i].first,
+                                     tournament.pairings[i].second, tournament.pairing_results[i]);
+                            tournament.player_list[white_idx].player_matches.push_back(m);
+                            tournament.player_list[black_idx].player_matches.push_back(m);
+
+                            tournament.player_list[white_idx].points += match_points.first;
+                            tournament.player_list[black_idx].points += match_points.second;
+                        }
+                        sv.pairing_online = false;
+                    }
+                    if(!ponlinecopy)
+                        ImGui::EndDisabled();
 
                     int pidxcopy = sv.player_selected_idx;
                     bool pactivecopy = sv.player_selected_idx > 0 ? tournament.player_list[sv.player_selected_idx].active : false;
@@ -653,7 +703,7 @@ int main(){
         if(sv.show_modify_player)
             show_modify_player_window(tournament, sv);
 
-        ImGui::ShowDemoWindow();
+        // ImGui::ShowDemoWindow();
 
         // Rendering
         ImGui::Render();

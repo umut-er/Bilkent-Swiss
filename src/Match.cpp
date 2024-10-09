@@ -1,4 +1,5 @@
 #include "Match.h"
+#include <iostream>
 
 std::map<MatchResult, std::pair<int, int>> result_to_points = {
     {MatchResult::REGULAR_WHITE_WIN, {2, 0}},
@@ -85,8 +86,8 @@ Match::Match(){
 
 }
 
-Match::Match(int round, int white_id)
-    : round(round), white_player_id(white_id), black_player_id(-1), game_result(MatchResult::UNMATCHED){
+Match::Match(int round, int white_id, MatchResult result)
+    : round(round), white_player_id(white_id), black_player_id(-1), game_result(result){
 
 }
 
@@ -146,12 +147,13 @@ int Match::get_opponent_id(int player_id) const{
 }
 
 int Match::get_player_color(int player_id) const{
-    if(match_is_bye() || game_result == MatchResult::UNMATCHED)
+    if(match_no_opponent())
         return -1;
     return player_id == black_player_id;
 }
 
-bool Match::match_is_bye() const{
+bool Match::match_no_opponent() const{
     return game_result == MatchResult::PAIRING_ALLOCATED_BYE 
-            || game_result == MatchResult::FULL_POINT_BYE || game_result == MatchResult::HALF_POINT_BYE;
+            || game_result == MatchResult::FULL_POINT_BYE || game_result == MatchResult::HALF_POINT_BYE
+            || game_result == MatchResult::UNMATCHED;
 }
