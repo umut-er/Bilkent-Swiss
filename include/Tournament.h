@@ -22,6 +22,7 @@ public:
     bool first_table_white = true;
     bool tournament_started;
     std::vector<Player> player_list;
+    std::vector<int> rankings_ids;              // Vector of player ids.
     std::vector<std::pair<int, int>> pairings; // vector of player ids
     std::vector<MatchResult> pairing_results;
     std::map<int, int> player_id_to_idx;
@@ -52,12 +53,10 @@ public:
     void start_tournament();
     
     static Tournament read_trf_file(const std::string& path);
-    // Creates the TRF (tournament report file).
     void create_trf_file();
-    // Create Pairing for Current Round
     void create_pairing();
-
     void enter_pairing_result(int idx, MatchResult res);
+    void generate_ranking();
 };
 
 #endif

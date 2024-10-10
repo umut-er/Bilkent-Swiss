@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <numeric>
 
 #include "../include/Tournament.h"
 
@@ -355,4 +356,20 @@ void Tournament::create_pairing(){
 
 void Tournament::enter_pairing_result(int idx, MatchResult res){
     pairing_results[idx] = res;
+}
+
+void Tournament::generate_ranking(){
+    rankings_ids.clear();
+    rankings_ids.resize(player_list.size());
+    std::iota(rankings_ids.begin(), rankings_ids.end(), 0);
+
+    std::sort(rankings_ids.begin(), rankings_ids.end(), [this](const int& p1, const int& p2){
+        if(this->player_list[p1].points != this->player_list[p2].points)
+            return this->player_list[p1].points > this->player_list[p2].points;
+        return p1 < p2;
+    });
+
+    for(int i = 0; i < (int)rankings_ids.size(); i++){
+        rankings_ids[i] = player_list[rankings_ids[i]].id;
+    }
 }

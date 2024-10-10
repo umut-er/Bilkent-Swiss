@@ -449,7 +449,48 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
 
 void show_ranking_listing(Tournament& tournament, StateVariables& sv){
     if (ImGui::BeginTabItem("Rankings")){
-        ImGui::Text("This page displays current rankings after the most recently finished round.");
+        if((int)tournament.rankings_ids.size() > 0){
+            float windowWidth = ImGui::GetWindowSize().x;
+            ImVec2 textSize = ImGui::CalcTextSize(tournament.tournament_name.c_str());
+            float textX = (windowWidth - textSize.x) * 0.5f;
+            if (textX > 0.0f) {
+                ImGui::SetCursorPosX(textX);
+            }
+            ImGui::Text(tournament.tournament_name.c_str());
+            if(ImGui::BeginTable("Tournament Info", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
+                ImGui::TableSetupColumn("Rank", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Rating", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("Points", ImGuiTableColumnFlags_WidthFixed);
+
+                // Headers
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("Rk.");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("Name");
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("Rtg");
+                ImGui::TableSetColumnIndex(3);
+                ImGui::Text("Pts");
+                
+                int idx = 1;
+                for(int rank_id : tournament.rankings_ids){
+                    Player& player = tournament.player_list[tournament.player_id_to_idx.at(rank_id)];
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%3d", idx);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text(player.name.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%4d", player.rating);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%2.1f", player.points / 2.);
+                    idx++;
+                }
+                ImGui::EndTable();
+            }
+        }
         ImGui::EndTabItem();
     }
 }
@@ -611,13 +652,14 @@ int main(){
                             tournament.player_list[white_idx].points += match_points.first;
                             tournament.player_list[black_idx].points += match_points.second;
                         }
+                        tournament.generate_ranking();
                         sv.pairing_online = false;
                     }
                     if(!ponlinecopy)
                         ImGui::EndDisabled();
 
                     int pidxcopy = sv.player_selected_idx;
-                    bool pactivecopy = sv.player_selected_idx > 0 ? tournament.player_list[sv.player_selected_idx].active : false;
+                    bool pactivecopy = sv.player_selected_idx >= 0 ? tournament.player_list[sv.player_selected_idx].active : false;
                     if(pidxcopy == -1 
                         || pactivecopy)
                         ImGui::BeginDisabled();
