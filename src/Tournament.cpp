@@ -117,7 +117,6 @@ Tournament Tournament::read_trf_file(const std::string& path){
     while(std::getline(trf_file, file_line)){
         file_lines.push_back(file_line);
     }
-
     Tournament t;
 
     // Interpret.
@@ -173,6 +172,8 @@ Tournament Tournament::read_trf_file(const std::string& path){
                         m.game_result = MatchResult::PAIRING_ALLOCATED_BYE;
                     else if(result == 'z' || result == 'Z' || result == ' ')
                         m.game_result = MatchResult::UNMATCHED;
+                    p.player_matches.push_back(m);
+                    end_idx += 10;
                     continue;
                 }
                 int opponent = std::stoi(opponent_string);
