@@ -1,6 +1,6 @@
-## TODO: Features 
+## TODO: Features
 
-- [IMPORTANT] Add a way to invalidate a pairing.
+- **[DONE]** [IMPORTANT] Add a way to invalidate a pairing.        
 - Add history (past pairings, rankings)
 - [IMPORTANT] Implement tie-breaker systems
 - Add a way to update results of previous pairings
