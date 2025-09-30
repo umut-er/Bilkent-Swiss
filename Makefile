@@ -1,5 +1,5 @@
 # Compiler and flags
-CC = g++-14
+CC = g++-15
 CFLAGS = -Wall -O2
 IFLAGS = -I$(IMGUI_DIR) -I$(IMGUI_BACKEND_DIR) -Iinclude -Iexternal/ImGuiFileDialog
 LFLAGS = -lSDL2 -lsdl2main

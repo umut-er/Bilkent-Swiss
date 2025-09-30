@@ -630,9 +630,25 @@ int main(){
                     }
                     if(ponlinecopy)
                         ImGui::EndDisabled();
+                    
+                    bool delete_current_copy = !ponlinecopy || tournament.round == 0;
+                    if(delete_current_copy)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Delete Current Pairing", ImVec2(-FLT_MIN, 30))){
+                        tournament.delete_current_pairing();
+                        for(int i = 0; i < (int)tournament.player_list.size(); i++){
+                            if(tournament.player_list[i].active)
+                                continue;
+                            tournament.player_list[i].player_matches.pop_back();
+                        }
+                        sv.pairing_online = false;
+                    }
+                    if(delete_current_copy)
+                        ImGui::EndDisabled();
+
                     if(!ponlinecopy)
                         ImGui::BeginDisabled();
-                    if(ImGui::Button("Conclude Current Round", ImVec2(-FLT_MIN, 30))){
+                    if(ImGui::Button("Finalize Current Round", ImVec2(-FLT_MIN, 30))){
                         // TODO: Verify all results are entered.
                         for(int i = 0; i < (int)tournament.pairings.size(); i++){
                             std::pair<int, int> match_points = result_to_points.at(tournament.pairing_results[i]);
@@ -658,6 +674,32 @@ int main(){
                     if(!ponlinecopy)
                         ImGui::EndDisabled();
 
+
+                    if(ponlinecopy || tournament.round == 0)
+                        ImGui::BeginDisabled();
+                    if(ImGui::Button("Reopen Current Round", ImVec2(-FLT_MIN, 30))){
+                        for(int i = 0; i < (int)tournament.pairings.size(); i++){
+                            std::pair<int, int> match_points = result_to_points.at(tournament.pairing_results[i]);
+                            int white_idx = tournament.player_id_to_idx.at(tournament.pairings[i].first);
+                            if(tournament.pairings[i].second < 0){          // Undo BYEs
+                                tournament.player_list[white_idx].points -= match_points.first;
+                                tournament.player_list[white_idx].player_matches.pop_back();
+                                continue;
+                            }
+                            int black_idx = tournament.player_id_to_idx.at(tournament.pairings[i].second);
+                            tournament.player_list[white_idx].player_matches.pop_back();
+                            tournament.player_list[black_idx].player_matches.pop_back();
+
+                            tournament.player_list[white_idx].points -= match_points.first;
+                            tournament.player_list[black_idx].points -= match_points.second;
+                        }
+                        tournament.remove_last_ranking();
+                        sv.pairing_online = true;
+                    }
+                    if(ponlinecopy || tournament.round == 0)
+                        ImGui::EndDisabled();
+                    
+
                     int pidxcopy = sv.player_selected_idx;
                     bool pactivecopy = sv.player_selected_idx >= 0 ? tournament.player_list[sv.player_selected_idx].active : false;
                     if(pidxcopy == -1 
@@ -678,7 +720,7 @@ int main(){
 
                     ImGui::Separator();
 
-                    if(sv.pairing_selected_idx == -1)
+                    if(sv.pairing_selected_idx == -1 || !sv.pairing_online)
                         ImGui::BeginDisabled();
                     if(ImGui::BeginTable("Tournament Info", 3, ImGuiTableFlags_SizingFixedFit)){
                         ImGui::TableSetupColumn("ROW1", ImGuiTableColumnFlags_WidthStretch);
@@ -723,7 +765,7 @@ int main(){
 
                         ImGui::EndTable();
                     }
-                    if(sv.pairing_selected_idx == -1)
+                    if(sv.pairing_selected_idx == -1 || !sv.pairing_online)
                         ImGui::EndDisabled();
                     if(!sv.tournament_started)
                         ImGui::EndDisabled();

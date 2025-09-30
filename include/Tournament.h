@@ -52,11 +52,14 @@ public:
     // Initializes the tournament with the given player list.
     void start_tournament();
     
+    // Pairing Functionality
     static Tournament read_trf_file(const std::string& path);
     void create_trf_file();
     void create_pairing();
+    void delete_current_pairing();
     void enter_pairing_result(int idx, MatchResult res);
     void generate_ranking();
+    void remove_last_ranking();
 };
 
 #endif

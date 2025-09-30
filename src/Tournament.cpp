@@ -355,6 +355,11 @@ void Tournament::create_pairing(){
         pairing_results.back() = MatchResult::PAIRING_ALLOCATED_BYE;
 }
 
+void Tournament::delete_current_pairing(){
+    round--;
+    pairings.pop_back();
+}
+
 void Tournament::enter_pairing_result(int idx, MatchResult res){
     pairing_results[idx] = res;
 }
@@ -373,4 +378,8 @@ void Tournament::generate_ranking(){
     for(int i = 0; i < (int)rankings_ids.size(); i++){
         rankings_ids[i] = player_list[rankings_ids[i]].id;
     }
+}
+
+void Tournament::remove_last_ranking(){
+    rankings_ids.clear();
 }
