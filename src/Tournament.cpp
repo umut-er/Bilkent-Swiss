@@ -330,56 +330,55 @@ void Tournament::create_pairing(){
        // Pairing not made
     }
     
-    pairings.clear();
+    std::vector<Match> cur_pairing;
     std::ifstream pairing_stream("round.txt");
-    int number_of_pairs = 0; bool bye_present = false;
+    int number_of_pairs = 0;
     pairing_stream >> number_of_pairs;
     for(int i = 0; i < number_of_pairs; i++){
         int first_player_idx, second_player_idx;
         pairing_stream >> first_player_idx >> second_player_idx;
         if(second_player_idx == 0){ // BYE CONDITION
             int first_player_id = player_list[first_player_idx-1].id;
-            pairings.push_back(std::make_pair(first_player_id, -1));
-            bye_present = true;
+            cur_pairing.push_back(
+                Match(round, first_player_id, MatchResult::PAIRING_ALLOCATED_BYE)
+            );
             continue;
         }
         first_player_idx--; second_player_idx--;
         int first_player_id = player_list[first_player_idx].id;
         int second_player_id = player_list[second_player_idx].id;
-        pairings.push_back(std::make_pair(first_player_id, second_player_id));
+        cur_pairing.push_back(
+            Match(round, first_player_id, second_player_id, MatchResult::UNINITIALIZED)
+        );
     }
-
-    pairing_results.clear();
-    pairing_results.resize(pairings.size(), MatchResult::UNINITIALIZED);
-    if(bye_present)
-        pairing_results.back() = MatchResult::PAIRING_ALLOCATED_BYE;
+    pairing_history.push_back(cur_pairing);
 }
 
 void Tournament::delete_current_pairing(){
     round--;
-    pairings.pop_back();
+    pairing_history.pop_back();
 }
 
 void Tournament::enter_pairing_result(int idx, MatchResult res){
-    pairing_results[idx] = res;
+    pairing_history.back()[idx].game_result = res;
 }
 
 void Tournament::generate_ranking(){
-    rankings_ids.clear();
-    rankings_ids.resize(player_list.size());
-    std::iota(rankings_ids.begin(), rankings_ids.end(), 0);
+    std::vector<int> current_ranking(player_list.size());
+    std::iota(current_ranking.begin(), current_ranking.end(), 0);
 
-    std::sort(rankings_ids.begin(), rankings_ids.end(), [this](const int& p1, const int& p2){
+    std::sort(current_ranking.begin(), current_ranking.end(), [this](const int& p1, const int& p2){
         if(this->player_list[p1].points != this->player_list[p2].points)
             return this->player_list[p1].points > this->player_list[p2].points;
         return p1 < p2;
     });
 
-    for(int i = 0; i < (int)rankings_ids.size(); i++){
-        rankings_ids[i] = player_list[rankings_ids[i]].id;
+    for(int i = 0; i < (int)current_ranking.size(); i++){
+        current_ranking[i] = player_list[current_ranking[i]].id;
     }
+    ranking_history.push_back(current_ranking);
 }
 
 void Tournament::remove_last_ranking(){
-    rankings_ids.clear();
+    ranking_history.pop_back();
 }

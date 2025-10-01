@@ -22,10 +22,12 @@ public:
     bool first_table_white = true;
     bool tournament_started;
     std::vector<Player> player_list;
-    std::vector<int> rankings_ids;              // Vector of player ids.
-    std::vector<std::pair<int, int>> pairings; // vector of player ids
-    std::vector<MatchResult> pairing_results;
+
+    // std::vector<int> rankings_ids;
+    std::vector<std::vector<int>> ranking_history;
+    std::vector<std::vector<Match>> pairing_history;
     std::map<int, int> player_id_to_idx;
+
 
     std::string tournament_name;
     std::string tournament_city;

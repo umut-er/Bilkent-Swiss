@@ -1,9 +1,9 @@
 ## TODO: Features
 
 - **[DONE]** [IMPORTANT] Add a way to invalidate a pairing.        
-- Add history (past pairings, rankings)
+- **[DONE]** Add history (past pairings, rankings)
 - [IMPORTANT] Implement tie-breaker systems
-- Add a way to update results of previous pairings
+- **[DONE, gotta use 1]** Add a way to update results of previous pairings
 
 ## TODO: Testing
 - Changing player names
