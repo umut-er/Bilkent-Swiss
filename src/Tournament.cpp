@@ -5,6 +5,7 @@
 #include <numeric>
 
 #include "../include/Tournament.h"
+#include "../include/Match.h"
 
 Tournament::Tournament() : round(0), tournament_started(false) {
 
@@ -25,7 +26,7 @@ void Tournament::add_player(std::string name, int rating){
         return;
     Player p(name, rating);
     for(int i = 0; i < round; i++){
-        p.player_matches.push_back(Match(i+1, p.id, MatchResult::UNMATCHED));
+        p.player_matches.push_back(Match(i+1, p.id, p.points, MatchResult::UNMATCHED));
     }
     player_list.push_back(p);
 
@@ -93,6 +94,44 @@ void Tournament::change_player_name_idx(int idx, std::string new_name){
     player_list[idx].name = new_name;
 }
 
+
+void Tournament::calculate_tiebreak(){
+    for (Player& p : player_list) {
+        p.bh_c1 = 0.0, p.sb = 0.0, p.aob = 0.0;
+        int min = 999;
+        for (Match& m : p.player_matches) {
+            int opponent_id = m.get_opponent_id(p.id);
+            if(opponent_id == -1){
+                min = 0;
+                continue;
+            }
+            int opponent_idx = this->player_id_to_idx.at(opponent_id);
+            Player opponent = this->player_list[opponent_idx];
+            if(opponent.points < min)
+                min = opponent.points;
+            p.bh_c1 += opponent.points;
+            p.sb += opponent.points * player_result_to_points.at(m.get_player_result(p.id));
+        }
+
+        if (min != 999)
+            p.bh_c1 -= min;
+
+        p.bh_c1 /= 2; p.sb /= 4;
+    }
+
+    for (Player& p : player_list) {
+        for (Match& m : p.player_matches) {
+            int opponent_id = m.get_opponent_id(p.id);
+            if(opponent_id == -1)
+                continue;
+            int opponent_idx = this->player_id_to_idx.at(opponent_id);
+            Player opponent = this->player_list[opponent_idx];
+            p.aob += opponent.bh_c1;
+        }
+        p.aob /= p.player_matches.size();
+    }
+}
+
 // TODO: Add Titles
 void Tournament::create_initial_ordering(){
     std::sort(player_list.begin(), player_list.end(), 
@@ -109,6 +148,8 @@ void Tournament::create_initial_ordering(){
     }
 }
 
+// TODO: This method cannot parse accurate scores in pairing history.
+// Only the final scores of players are recorded.
 Tournament Tournament::read_trf_file(const std::string& path){
     // Tokenize the input file
     std::ifstream trf_file(path);
@@ -340,7 +381,8 @@ void Tournament::create_pairing(){
         if(second_player_idx == 0){ // BYE CONDITION
             int first_player_id = player_list[first_player_idx-1].id;
             cur_pairing.push_back(
-                Match(round, first_player_id, MatchResult::PAIRING_ALLOCATED_BYE)
+                Match(round, first_player_id, player_list[first_player_idx-1].points,  
+                    MatchResult::PAIRING_ALLOCATED_BYE)
             );
             continue;
         }
@@ -348,7 +390,10 @@ void Tournament::create_pairing(){
         int first_player_id = player_list[first_player_idx].id;
         int second_player_id = player_list[second_player_idx].id;
         cur_pairing.push_back(
-            Match(round, first_player_id, second_player_id, MatchResult::UNINITIALIZED)
+            Match(round, first_player_id, second_player_id, 
+                player_list[first_player_idx].points, player_list[second_player_idx].points,
+                MatchResult::UNINITIALIZED
+            )
         );
     }
     pairing_history.push_back(cur_pairing);
@@ -365,18 +410,31 @@ void Tournament::enter_pairing_result(int idx, MatchResult res){
 
 void Tournament::generate_ranking(){
     std::vector<int> current_ranking(player_list.size());
+    std::vector<RankingLog> current_ranking_log(player_list.size());
     std::iota(current_ranking.begin(), current_ranking.end(), 0);
 
     std::sort(current_ranking.begin(), current_ranking.end(), [this](const int& p1, const int& p2){
         if(this->player_list[p1].points != this->player_list[p2].points)
             return this->player_list[p1].points > this->player_list[p2].points;
+        if(this->player_list[p1].bh_c1 != this->player_list[p2].bh_c1)
+            return this->player_list[p1].bh_c1 > this->player_list[p2].bh_c1;
+        if(this->player_list[p1].sb != this->player_list[p2].sb)
+            return this->player_list[p1].sb > this->player_list[p2].sb;
+        if(this->player_list[p1].aob != this->player_list[p2].aob)
+            return this->player_list[p1].aob > this->player_list[p2].aob;
         return p1 < p2;
     });
 
     for(int i = 0; i < (int)current_ranking.size(); i++){
-        current_ranking[i] = player_list[current_ranking[i]].id;
+        RankingLog r;
+        r.player_id = player_list[current_ranking[i]].id;
+        r.score = player_list[current_ranking[i]].points;
+        r.bh_c1 = player_list[current_ranking[i]].bh_c1;
+        r.sb = player_list[current_ranking[i]].sb;
+        r.aob = player_list[current_ranking[i]].aob;
+        current_ranking_log[i] = r;
     }
-    ranking_history.push_back(current_ranking);
+    ranking_history.push_back(current_ranking_log);
 }
 
 void Tournament::remove_last_ranking(){

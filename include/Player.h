@@ -21,6 +21,9 @@ public:
 
     int points;
     std::vector<Match> player_matches;
+    float bh_c1;
+    float sb;
+    float aob;
 
     Player(std::string player_name, int player_rating);
 };

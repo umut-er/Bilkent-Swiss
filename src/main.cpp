@@ -409,7 +409,7 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
                     ImGui::TableSetColumnIndex(2);
                     ImGui::Text("%4d", tournament.player_list[first_player_idx].rating);
                     ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%2.1f", tournament.player_list[first_player_idx].points / 2.);
+                    ImGui::Text("%2.1f", match.white_cur_score / 2.);
 
                     ImGui::TableSetColumnIndex(4);
                     float column_width = ImGui::GetColumnWidth();
@@ -423,7 +423,7 @@ void show_pairing_listing(Tournament& tournament, StateVariables& sv){
                     if(second_player_idx < 0)
                         ImGui::Text("  ");
                     else
-                        ImGui::Text("%2.1f", tournament.player_list[second_player_idx].points / 2.);
+                        ImGui::Text("%2.1f", match.black_cur_score / 2.);
                     ImGui::TableSetColumnIndex(6);
                     std::string black_name_field = "";
                     if(second_player_idx < 0)
@@ -463,11 +463,14 @@ void show_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::SetCursorPosX(textX);
             }
             ImGui::Text(tournament.tournament_name.c_str());
-            if(ImGui::BeginTable("Tournament Info", 4, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
+            if(ImGui::BeginTable("Tournament Info", 7, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)){
                 ImGui::TableSetupColumn("Rank", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
                 ImGui::TableSetupColumn("Rating", ImGuiTableColumnFlags_WidthFixed);
                 ImGui::TableSetupColumn("Points", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("BH-C1", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("SB", ImGuiTableColumnFlags_WidthFixed);
+                ImGui::TableSetupColumn("AOB", ImGuiTableColumnFlags_WidthFixed);
 
                 // Headers
                 ImGui::TableNextRow();
@@ -479,10 +482,16 @@ void show_ranking_listing(Tournament& tournament, StateVariables& sv){
                 ImGui::Text("Rtg");
                 ImGui::TableSetColumnIndex(3);
                 ImGui::Text("Pts");
+                ImGui::TableSetColumnIndex(4);
+                ImGui::Text("BH-C1");
+                ImGui::TableSetColumnIndex(5);
+                ImGui::Text("SB   ");
+                ImGui::TableSetColumnIndex(6);
+                ImGui::Text("AOB  ");
                 
                 int idx = 1;
-                for(int rank_id : tournament.ranking_history[sv.UI_round-1]){
-                    Player& player = tournament.player_list[tournament.player_id_to_idx.at(rank_id)];
+                for(RankingLog log : tournament.ranking_history[sv.UI_round-1]){
+                    Player& player = tournament.player_list[tournament.player_id_to_idx.at(log.player_id)];
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%3d", idx);
@@ -491,7 +500,13 @@ void show_ranking_listing(Tournament& tournament, StateVariables& sv){
                     ImGui::TableSetColumnIndex(2);
                     ImGui::Text("%4d", player.rating);
                     ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("%2.1f", player.points / 2.);
+                    ImGui::Text("%2.1f", log.score / 2.);
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::Text("%2.1f", log.bh_c1);
+                    ImGui::TableSetColumnIndex(5);
+                    ImGui::Text("%2.1f", log.sb);
+                    ImGui::TableSetColumnIndex(6);
+                    ImGui::Text("%2.1f", log.aob);
                     idx++;
                 }
                 ImGui::EndTable();
@@ -665,7 +680,9 @@ int main(){
                         for(int i = 0; i < (int)tournament.player_list.size(); i++){
                             if(tournament.player_list[i].active)
                                 continue;
-                            Match absent(tournament.round, tournament.player_list[i].id, MatchResult::UNMATCHED);
+                            Match absent(tournament.round, tournament.player_list[i].id, 
+                                tournament.player_list[i].points, MatchResult::UNMATCHED
+                            );
                             tournament.player_list[i].player_matches.push_back(absent);
                         }
                         sv.pairing_online = true;
@@ -676,7 +693,10 @@ int main(){
                     bool delete_current_copy = !ponlinecopy || tournament.round == 0;
                     if(delete_current_copy)
                         ImGui::BeginDisabled();
+
                     if(ImGui::Button("Delete Current Pairing", ImVec2(-FLT_MIN, 30))){
+                        if(sv.UI_round == tournament.round)
+                            sv.UI_round--;
                         tournament.delete_current_pairing();
                         for(int i = 0; i < (int)tournament.player_list.size(); i++){
                             if(tournament.player_list[i].active)
@@ -685,6 +705,7 @@ int main(){
                         }
                         sv.pairing_online = false;
                     }
+
                     if(delete_current_copy)
                         ImGui::EndDisabled();
 
@@ -714,7 +735,8 @@ int main(){
                             tournament.player_list[white_idx].points += match_points.first;
                             tournament.player_list[black_idx].points += match_points.second;
                         }
-
+                        
+                        tournament.calculate_tiebreak();
                         tournament.generate_ranking();
                         sv.pairing_online = false;
                     }
@@ -741,6 +763,7 @@ int main(){
                             tournament.player_list[black_idx].points -= match_points.second;
                         }
                         tournament.remove_last_ranking();
+                        tournament.calculate_tiebreak();
                         sv.pairing_online = true;
                     }
                     if(ponlinecopy || tournament.round == 0)
@@ -792,11 +815,11 @@ int main(){
                         if(ImGui::Button("+ / -", ImVec2(-FLT_MIN, 30)))
                             tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_WHITE_WIN);
                         ImGui::TableNextColumn();
-                        if(ImGui::Button("- / +", ImVec2(-FLT_MIN, 30)))
-                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_BLACK_WIN);
-                        ImGui::TableNextColumn();
                         if(ImGui::Button("- / -", ImVec2(-FLT_MIN, 30)))
                             tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_BOTH);
+                        ImGui::TableNextColumn();
+                        if(ImGui::Button("- / +", ImVec2(-FLT_MIN, 30)))
+                            tournament.enter_pairing_result(sv.pairing_selected_idx, MatchResult::FORFEIT_BLACK_WIN);
 
                         // Unrated
                         ImGui::TableNextRow();

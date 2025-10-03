@@ -49,6 +49,7 @@ enum class PlayerResult {
 extern std::map<MatchResult, std::pair<int, int>> result_to_points;
 extern std::map<MatchResult, std::string> result_to_string;
 extern std::map<PlayerResult, char> result_to_rtfchar;
+extern std::map<PlayerResult, int> player_result_to_points;
 extern std::map<char, PlayerResult> rtfchar_to_result;
 
 /**
@@ -59,11 +60,13 @@ public:
     int round;
     int white_player_id;
     int black_player_id;
+    int white_cur_score;
+    int black_cur_score;
     MatchResult game_result;
 
     Match();
-    Match(int round, int white_id, MatchResult result);     // Constructor for absentee or bye games.
-    Match(int round, int white_id, int black_id, MatchResult result);
+    Match(int round, int white_id, int white_cur_score, MatchResult result);     // Constructor for absentee or bye games.
+    Match(int round, int white_id, int black_id, int white_cur_score, int black_cur_score, MatchResult result);
 
     PlayerResult get_player_result(int player_id) const;
     int get_opponent_id(int player_id) const;

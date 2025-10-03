@@ -43,6 +43,25 @@ std::map<MatchResult, std::string> result_to_string = {
     {MatchResult::UNINITIALIZED, "  "}
 };
 
+std::map<PlayerResult, int> player_result_to_points = {
+    { PlayerResult::REGULAR_WIN, 2},
+    { PlayerResult::FORFEIT_WIN, 2},
+    { PlayerResult::UNRATED_WIN, 2},
+
+    { PlayerResult::REGULAR_DRAW, 1},
+    { PlayerResult::UNRATED_DRAW, 1},
+
+    { PlayerResult::REGULAR_LOSS, 0},
+    { PlayerResult::FORFEIT_LOSS, 0},
+    { PlayerResult::UNRATED_LOSS, 0},
+
+    { PlayerResult::FULL_POINT_BYE, 2},
+    { PlayerResult::HALF_POINT_BYE, 1},
+    { PlayerResult::PAIRING_ALLOCATED_BYE, 2},
+    { PlayerResult::ABSENT, 0},
+    { PlayerResult::UNDETERMINED, 0},
+};
+
 std::map<PlayerResult, char> result_to_rtfchar = {
     { PlayerResult::REGULAR_WIN, '1'},
     { PlayerResult::FORFEIT_WIN, '+'},
@@ -86,13 +105,15 @@ Match::Match(){
 
 }
 
-Match::Match(int round, int white_id, MatchResult result)
-    : round(round), white_player_id(white_id), black_player_id(-1), game_result(result){
+Match::Match(int round, int white_id, int white_cur_score, MatchResult result)
+    : round(round), white_player_id(white_id), black_player_id(-1), 
+    white_cur_score(white_cur_score), black_cur_score(0), game_result(result){
 
 }
 
-Match::Match(int round, int white_id, int black_id, MatchResult result)
-    : round(round), white_player_id(white_id), black_player_id(black_id), game_result(result){
+Match::Match(int round, int white_id, int black_id, int white_cur_score, int black_cur_score, MatchResult result)
+    : round(round), white_player_id(white_id), black_player_id(black_id),
+    white_cur_score(white_cur_score), black_cur_score(black_cur_score), game_result(result){
 
 }
 

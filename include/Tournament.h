@@ -8,6 +8,17 @@
 
 #include "Player.h"
 
+
+class RankingLog {
+public:
+    int player_id;
+    int score;
+    float bh_c1;
+    float sb;
+    float aob;
+};
+
+
 /**
  * A wrapper to handle a full blown swiss tournament.
  * Uses the bbpPairing pairing engine. 
@@ -24,7 +35,7 @@ public:
     std::vector<Player> player_list;
 
     // std::vector<int> rankings_ids;
-    std::vector<std::vector<int>> ranking_history;
+    std::vector<std::vector<RankingLog>> ranking_history;
     std::vector<std::vector<Match>> pairing_history;
     std::map<int, int> player_id_to_idx;
 
@@ -50,6 +61,8 @@ public:
     void change_player_name(std::string old_name, std::string new_name);
     void change_player_rating_idx(int idx, int new_rating);
     void change_player_name_idx(int idx, std::string new_name);
+
+    void calculate_tiebreak();
 
     // Initializes the tournament with the given player list.
     void start_tournament();
