@@ -69,8 +69,8 @@ public:
     
     // Pairing Functionality
     static Tournament read_trf_file(const std::string& path);
-    void create_trf_file();
-    void create_pairing();
+    bool create_trf_file(const std::string& path = "out.trf");
+    bool create_pairing();
     void delete_current_pairing();
     void enter_pairing_result(int idx, MatchResult res);
     void generate_ranking();
